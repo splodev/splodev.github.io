@@ -407,7 +407,7 @@ uint64_t try_break_kaslr(int fd) {
 
 ![](/assets/IrisCTF-Checksumz/Pasted%20image%2020250110024519.png)
 
-Полный эксплоит и заголовочный файл предствалены ниже, а также доступны в [нашем репозитории](https://github.com/splodev/writeups/tree/main/CTFs/IrisCTF_2025/Checksumz).
+Полный эксплоит и заголовочный файл представлены ниже, а также доступны в [нашем репозитории](https://github.com/splodev/writeups/tree/main/CTFs/IrisCTF_2025/Checksumz).
 
 main.c
 ```c
