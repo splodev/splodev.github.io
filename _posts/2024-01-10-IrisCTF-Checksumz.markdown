@@ -6,6 +6,8 @@ categories: ctf writeup
 tags: linux kernel pwn cpu_entry_area modeprobe_path
 ---
 
+*Подписывайтесь на TG канал [/b/exploits](https://t.me/sploitdev)*
+
 В статье представлено решение задания на эксплуатацию модуля ядра Linux с прошедшего [IrisCTF 2025](https://ctftime.org/event/2503)
 
 ![](/assets/IrisCTF-Checksumz/Pasted%20image%2020250108150036.png)
@@ -556,3 +558,5 @@ struct checksum_buffer {
 
 #endif /* SONGBIRD_API_H */
 ```
+
+*Подписывайтесь на TG канал [/b/exploits](https://t.me/sploitdev)*
