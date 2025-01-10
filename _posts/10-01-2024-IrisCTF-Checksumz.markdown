@@ -8,14 +8,14 @@ tags: linux kernel pwn cpu_entry_area modeprobe_path
 
 В статье представлено решение задания на эксплуатацию модуля ядра Linux с прошедшего [IrisCTF 2025](https://ctftime.org/event/2503)
 
-![](/assets/IrisCTF-Checksumz/Pasted image 20250108150036.png)
+![](/assets/IrisCTF-Checksumz/Pasted%20image%2020250108150036.png)
 
 Дан архив с окружением для запуска Linux-а с уязвимым модулем ядра.
 Распакуем архив и получим следующие файлы:
-![](/assets/IrisCTF-Checksumz/Pasted image 20250108150145.png)
+![](/assets/IrisCTF-Checksumz/Pasted%20image%2020250108150145.png)
 
 Нам интересна директория `chal-module` и файл с исходным кодом модуля `chal.c`
-![](/assets/IrisCTF-Checksumz/Pasted image 20250108150303.png)
+![](/assets/IrisCTF-Checksumz/Pasted%20image%2020250108150303.png)
 
 Код модуля и остальные файлы по заданию можно найти [здесь](https://cdn.2025.irisc.tf/checksumz.tar.gz).
 
@@ -173,7 +173,7 @@ int main() {
 ```
 
 Запустим и посмотрим на считанный буфер:
-![](/assets/IrisCTF-Checksumz/Pasted image 20250109024341.png)
+![](/assets/IrisCTF-Checksumz/Pasted%20image%2020250109024341.png)
 
 Явно видно некоторый указатель и мы даже знаем, что это указатель на `name`, но это знание нам не даёт возможность получить адрес загрузки ядра. Запомним эту уязвимость и продолжим смотреть код.
 Проанализируем как работает запись в драйвер. Это функция `checksumz_write_iter`:
@@ -301,7 +301,7 @@ uint64_t try_break_kaslr(int fd) {
 ```
 
 Запустим и посмотрим на полученные адреса.
-![](/assets/IrisCTF-Checksumz/Pasted image 20250110010544.png)
+![](/assets/IrisCTF-Checksumz/Pasted%20image%2020250110010544.png)
 Можно проверить в отладчике, но кажется, что всё должно было сработать верно.
 Теперь надо понять как превратить это в примитив для получения KASLR. 
 
@@ -368,7 +368,7 @@ uint64_t try_break_kaslr(int fd) {
 ```
 
 Запустим обновлённый код:
-![](/assets/IrisCTF-Checksumz/Pasted image 20250110015312.png)
+![](/assets/IrisCTF-Checksumz/Pasted%20image%2020250110015312.png)
 
 С базой загрузки ядра мы можем переписать значение `modeprobe_path` и получить повышение привелегий. Про эту технику тоже можно прочитать в интернете. Например, вот [здесь](https://lkmidas.github.io/posts/20210223-linux-kernel-pwn-modprobe/). Суть техники в двух словах — есть некоторая переменная где записан путь до исполняемого файла который вызовется с правами рута при попытке запуска приложения с определённым magic-значением в заголовке. 
 Допишем наш эксплоит. Записывать память будем всё также через установку `buffer->pos` и запись в файл через `write`.
@@ -398,7 +398,7 @@ uint64_t try_break_kaslr(int fd) {
 ```
 
 Запускаем на сервере и получаем флаг:
-![](/assets/IrisCTF-Checksumz/Pasted image 20250110024519.png)
+![](/assets/IrisCTF-Checksumz/Pasted%20image%2020250110024519.png)
 
 Полный эксплоит и заголовочный файл предствалены ниже, а также доступны в [нашем репозитории](https://github.com/splodev/writeups/tree/main/CTFs/IrisCTF_2025/Checksumz).
 
