@@ -4,4 +4,4 @@ title: About
 permalink: /about/
 ---
 
-Посты подготовлены Telegram каналом /b/exploits (https://t.me/sploitdev)
+Посты подготовлены Telegram каналом [/b/exploits](https://t.me/sploitdev)
