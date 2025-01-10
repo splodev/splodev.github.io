@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "IrisCTF 2025 - Checksumz"
+title:  "IrisCTF 2025 — Checksumz"
 date:   2024-01-10 13:37:00 +0300
 categories: ctf writeup
 tags: linux kernel pwn cpu_entry_area modeprobe_path
