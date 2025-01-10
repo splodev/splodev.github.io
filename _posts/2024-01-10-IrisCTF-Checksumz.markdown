@@ -20,6 +20,7 @@ tags: linux kernel pwn cpu_entry_area modeprobe_path
 ![](/assets/IrisCTF-Checksumz/Pasted%20image%2020250108150303.png)
 
 Код модуля можно найти в [нашем репозитории](https://github.com/splodev/writeups/tree/main/CTFs/IrisCTF_2025/Checksumz/module)
+
 Архив с заданием доступен по [ссылке](https://cdn.2025.irisc.tf/checksumz.tar.gz) (на момент января 2025)
 
 Начнём разбор кода модуля по частям чтобы понять что он делает и какие интерфейсы взаимодействия предоставляет пользователю.
