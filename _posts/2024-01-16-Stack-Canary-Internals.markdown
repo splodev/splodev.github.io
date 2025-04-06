@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "Всё что вы хотели и не хотели знать о стековой канарейке"
-date:   2025-04-07 13:37:00 +0300
+date:   2025-04-06 13:37:00 +0300
 categories: internals mitigations
 tags: linux userspace stack_canary
 ---
