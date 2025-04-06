@@ -307,5 +307,143 @@ if (copy_to_user(u_rand_bytes, k_rand_bytes, sizeof(k_rand_bytes)))
 
 В следующей части мы разберём реализацию канарейки в ядре Linux. 
 
+# Стековая канарейка в ядре Linux
+
+Базовый принцип работы стековой канарейки в ядре точно такой же, как и в пользовательском пространстве. Основное отличие в том, что канарейка здесь генерируется один раз при инициализации.
+
+На скриншоте ниже показано что реализация функции генерации канарейки зависит от архитектуры процессора.
+
+![](/assets/Stack-Canary-Internals/Pasted%20image%2020250202010435.png)
+
+Мы посмотрим [реализацию](https://elixir.bootlin.com/linux/v6.13/source/arch/x86/include/asm/stackprotector.h#L50) для x86.
+
+```c
+static __always_inline void boot_init_stack_canary(void)
+{
+	unsigned long canary = get_random_canary();
+
+#ifdef CONFIG_X86_64
+	BUILD_BUG_ON(offsetof(struct fixed_percpu_data, stack_canary) != 40);
+#endif
+
+	current->stack_canary = canary;
+#ifdef CONFIG_X86_64
+	this_cpu_write(fixed_percpu_data.stack_canary, canary);
+#else
+	this_cpu_write(__stack_chk_guard, canary);
+#endif
+}
+```
+
+Возьмем функцию `get_random_canary()` и её результат запишется в глобальную переменную, которая будет использоваться на ядерном стеке для его защиты.
+
+Функция получения канарейки выглядит [так](https://elixir.bootlin.com/linux/v6.13/source/include/linux/stackprotector.h#L23).
+
+```c
+#ifdef CONFIG_64BIT
+# ifdef __LITTLE_ENDIAN
+#  define CANARY_MASK 0xffffffffffffff00UL
+# else /* big endian, 64 bits: */
+#  define CANARY_MASK 0x00ffffffffffffffUL
+# endif
+#else /* 32 bits: */
+# define CANARY_MASK 0xffffffffUL
+#endif
+
+static inline unsigned long get_random_canary(void)
+{
+	return get_random_long() & CANARY_MASK;
+}
+```
+
+Функция `get_random_long()` возвращает случайное значение в зависимости от размера указателя. Для получения случайного значения используется функция `get_random_bytes()`, с которой мы уже знакомы.
+
+Так это выглядит в скомпилированном ядре и вот куда конкретно записывается канарейка:
+![](/assets/Stack-Canary-Internals/Pasted%20image%2020250407003117.png)
+
+Мы записываем канарейку по смещению 0x28 от некоторого регистра GS. 
+
+Если вернуться к исходному коду и посмотреть куда пишем канарейку, то выйдем на структуру `fixed_percpu_data`.
+
+```c
+struct fixed_percpu_data {
+	/*
+	 * GCC hardcodes the stack canary as %gs:40.  Since the
+	 * irq_stack is the object at %gs:0, we reserve the bottom
+	 * 48 bytes of the irq stack for the canary.
+	 *
+	 * Once we are willing to require -mstack-protector-guard-symbol=
+	 * support for x86_64 stackprotector, we can get rid of this.
+	 */
+	char		gs_base[40];
+	unsigned long	stack_canary;
+};
+```
+
+Именем этой структуры также называется глобальная переменная, где лежит канарейка. 
+Можно обратить внимание на комментарии, а ещё на вот на [это обсуждение](https://lore.kernel.org/lkml/20231023211730.40566-1-brgerst@gmail.com/T/), в котором проливается свет на довольно прикольный факт.
+
+Дело в том, что компилятор GCC зарезервировал за собой право использовать для стековой канарейки регистр GS по смещению 0x28. А в ядре этот регистр в том числе используется для хранения объекта `irq_stack` который представляет собой дополнительный стек обработки аппаратных прерываний.
+
+Инициализация значения регистра GS происходит в самом начале запуска ядра. Представляет собой чтение значения из регистра MSR. 
+[Сниппет](https://elixir.bootlin.com/linux/v6.13/source/arch/x86/kernel/cpu/common.c#L744) кода:
+
+```c
+void __init switch_gdt_and_percpu_base(int cpu)
+{
+	load_direct_gdt(cpu);
+#ifdef CONFIG_X86_64
+	/*
+	 * No need to load %gs. It is already correct.
+	 *
+	 * Writing %gs on 64bit would zero GSBASE which would make any per
+	 * CPU operation up to the point of the wrmsrl() fault.
+	 *
+	 * Set GSBASE to the new offset. Until the wrmsrl() happens the
+	 * early mapping is still valid. That means the GSBASE update will
+	 * lose any prior per CPU data which was not copied over in
+	 * setup_per_cpu_areas().
+	 *
+	 * This works even with stackprotector enabled because the
+	 * per CPU stack canary is 0 in both per CPU areas.
+	 */
+	wrmsrl(MSR_GS_BASE, cpu_kernelmode_gs_base(cpu));
+#else
+	/*
+	 * %fs is already set to __KERNEL_PERCPU, but after switching GDT
+	 * it is required to load FS again so that the 'hidden' part is
+	 * updated from the new GDT. Up to this point the early per CPU
+	 * translation is active. Any content of the early per CPU data
+	 * which was not copied over in setup_per_cpu_areas() is lost.
+	 */
+	loadsegment(fs, __KERNEL_PERCPU);
+#endif
+}
+```
+
+Мы можем проверить это в отладке ядра. Найдём для начала адрес переменной `per_cpu_offset` где хранится адрес куда указывает GS регистр:
+
+![](/assets/Stack-Canary-Internals/Pasted%20image%2020250407014238.png)
+
+Проверим что лежит по нашему адресу и что лежит в регистре `gs_base`:
+![](/assets/Stack-Canary-Internals/Pasted%20image%2020250407014311.png)
+
+Всё корректно.
+Теперь проверим, что по смещению 0x28 действительно лежит канарейка:
+
+![](/assets/Stack-Canary-Internals/Pasted%20image%2020250407014444.png)
+
+И это тоже верно. 
+Также хочется обратить внимание на то, что страницы куда указывается регистр GS имеют права RW, а это означает, что потенциально возможна атака с перезаписью канарейки. 
+Но если у вас есть возможность писать по любому адресу в ядре, вряд ли вы будете заморачиваться с перезаписью канарейки.
+
+![](/assets/Stack-Canary-Internals/Pasted%20image%2020250407014724.png)
+
+## Итого
+Базовая идея реализации канарейки в ядре очень схожа с user space. Мы берём случайные 8 байт и записываем их в некоторое смещение относительно сегментного регистра. Значение регистра мы берём из регистра MSR.
+
+Что касается обходов, то здесь есть только один реалистичный вариант — утечка памяти.
+
+В следующей части мы разберём реализацию стековой канарейки в Windows user space.
 
 *Больше райтапов и материалов по пывну в [телеграм канале](https://t.me/sploitdev)*
